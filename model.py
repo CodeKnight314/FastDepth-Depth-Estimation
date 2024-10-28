@@ -92,8 +92,8 @@ class Decoder(nn.Module):
         x = self.iconv1(x)
         
         depth = self.depth_predictor(x)
-        depth = F.relu(depth)  # Ensure non-negative depth values
-        
+        depth = torch.sigmoid(depth)
+
         return depth
 
 # Example usage

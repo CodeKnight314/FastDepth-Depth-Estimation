@@ -7,11 +7,11 @@ import numpy as np
 import torch
 
 class NYU_DepthDataset(Dataset):
-    def __init__(self, input_dir: str):
+    def __init__(self, input_dir: str, mode: str):
         super().__init__()
         
-        self.rgb_images = sorted(glob(os.path.join(input_dir, "*_rgb.jpg")))
-        self.depth_images = sorted(glob(os.path.join(input_dir, "*_depth.png")))
+        self.rgb_images = sorted(glob(os.path.join(input_dir, mode, "RGB" "*")))
+        self.depth_images = sorted(glob(os.path.join(input_dir, mode, "Depth" "*")))
         
         assert len(self.rgb_images) == len(self.depth_images), "Number of RGB and depth images should be the same."
         
@@ -34,3 +34,8 @@ class NYU_DepthDataset(Dataset):
         depth_tensor = torch.from_numpy(depth_np).unsqueeze(0)
         
         return rgb_tensor, depth_tensor
+    
+def load_dataset(input_dir: str, mode: str, batch_size: int):
+    dataset = NYU_DepthDataset(input_dir, mode)
+    dataloader = DataLoader(dataset=dataset, shuffle=True, batch_size=batch_size, num_workers=os.cpu_count())
+    return dataloader

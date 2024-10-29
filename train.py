@@ -21,12 +21,12 @@ def depth_estimation(model, optimizer, train_dl, valid_dl, logger, loss_fn, epoc
     for epoch in range(epochs):
         model.train()
         total_train_loss = 0.0
-        for images, labels in tqdm(train_dl, desc=f"Training Epoch {epoch+1}/{epochs}"):
-            images, labels = images.to(device), labels.to(device)
+        for rgb, depth in tqdm(train_dl, desc=f"Training Epoch {epoch+1}/{epochs}"):
+            rgb, depth = rgb.to(device), depth.to(device)
             optimizer.zero_grad()
             
-            outputs = model(images)
-            loss = loss_fn(outputs, labels)
+            outputs = model(rgb)
+            loss = loss_fn(outputs, depth)
             
             loss.backward()
             optimizer.step()
@@ -55,15 +55,15 @@ def depth_estimation(model, optimizer, train_dl, valid_dl, logger, loss_fn, epoc
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_dir")
-    parser.add_argument("--output_path")
-    parser.add_argument("--epochs", default=20)
-    parser.add_argument("--lr", default=0.01)
-    parser.add_argument("--batch_size", default=8)
+    parser.add_argument("--root_dir", type=str, required=True, help="Path to the root directory of the dataset")
+    parser.add_argument("--output_path", type=str, required=True, help="Path to save output files and logs")
+    parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate for the optimizer")
+    parser.add_argument("--batch_size", type=int, default=8, help="Batch size for training and validation")
     args = parser.parse_args()
     
     model = FastDepth(input_channels=3).to(device=device)
-    optimizer = opt.SGD(args.lr, momentum=0.9, weight_decay=0.0001)
+    optimizer = opt.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0001)
     
     logger = LOGWRITER(output_directory=os.path.join(args.output_path, "experiment_log"), total_epochs=args.epochs)
     

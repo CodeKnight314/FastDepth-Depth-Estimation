@@ -52,7 +52,7 @@ class MobileNetEncoder(nn.Module):
             features.append(x)
         return features  # Return a list of feature maps for skip connections
 
-class Decoder(nn.Module): 
+class DepthDecoder(nn.Module): 
     def __init__(self, input_channels: int):
         super().__init__()
         self.upconv5 = nn.ConvTranspose2d(input_channels, 512, kernel_size=3, stride=2, padding=1, output_padding=1)
@@ -95,14 +95,21 @@ class Decoder(nn.Module):
         depth = torch.sigmoid(depth)
 
         return depth
+    
+class FastDepth(nn.Module): 
+    def __init__(self, input_channels: int): 
+        super().__init__()
+        
+        self.encoder = MobileNetEncoder(input_channels=input_channels)
+        self.decoder = DepthDecoder(input_channels=1024)
+        
+    def forward(self, x): 
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
 
-# Example usage
 if __name__ == "__main__":
-    encoder = MobileNetEncoder(input_channels=3)
-    decoder = Decoder(input_channels=1024)
-    input_tensor = torch.randn(1, 3, 224, 224)  # Example input
-    features = encoder(input_tensor)
-    for feature in features:
-        print("Feature shape:", feature.shape)  # Print shape of each feature map
-    depth_output = decoder(features)
-    print("Output shape:", depth_output.shape)  # Expected output shape: (1, 1, 256, 256)
+    model = FastDepth(input_channels=3)
+    input_tensor = torch.randn(1, 3, 224, 224)
+    depth_output = FastDepth(input_tensor)
+    print("Output shape:", depth_output.shape)

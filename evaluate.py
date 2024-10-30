@@ -55,15 +55,12 @@ def evaluate(model, val_dl, output_path, device="cuda"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_dir")
-    parser.add_argument("--output_path")
-    parser.add_argument("--epochs", default=20)
-    parser.add_argument("--lr", default=0.01)
-    parser.add_argument("--batch_size", default=8)
+    parser.add_argument("--root_dir", type=str, required=True, help="Path to the root directory of the dataset")
+    parser.add_argument("--output_path", type=str, required=True, help="Path to save output files and logs")
     args = parser.parse_args()
     
     model = FastDepth(input_channels=3).to(device=device)    
     
-    val_dl = load_dataset(args.root_dir, "test", args.batch_size)
+    val_dl = load_dataset(args.root_dir, "test", 1)
     
     evaluate(model, val_dl, args.output_path)

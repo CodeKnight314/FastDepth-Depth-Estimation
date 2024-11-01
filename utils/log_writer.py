@@ -17,7 +17,7 @@ class LOGWRITER:
             writer.write(f"Log file created on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             writer.flush()
 
-    def log_results(self, epoch, **kwargs):
+    def log_results(self, epoch: int, **kwargs):
         """
         Logs the specified epoch's metrics and other key-value paired information to the log file.
 

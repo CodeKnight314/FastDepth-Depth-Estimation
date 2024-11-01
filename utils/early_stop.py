@@ -33,11 +33,13 @@ class EarlyStopMechanism:
         self.current_iteration += 1
 
         if self.mode == 'min':
-            relative_change = (self.best_metric - metric) / self.best_metric
+            relative_change = abs((self.best_metric - metric) / self.best_metric) if self.best_metric != float("inf") else 0
+            improvement = metric < self.best_metric and relative_change >= self.metric_threshold
         else:
-            relative_change = (metric - self.best_metric) / self.best_metric
-            
-        if self.best_metric > metric:
+            relative_change = abs((metric - self.best_metric) / self.best_metric) if self.best_metric != float("-inf") else 0
+            improvement = metric > self.best_metric and relative_change >= self.metric_threshold
+
+        if improvement:
             self.best_metric = metric
             self.best_iteration = self.current_iteration
             self.save_model(model)
@@ -60,7 +62,7 @@ class EarlyStopMechanism:
         Returns:
             bool: True if early stopping should be applied, False otherwise.
         """
-        if self.current_iteration - self.best_iteration >= self.grace_threshold:
+        if self.current_iteration - self.best_iteration > self.grace_threshold:
             return True
         return False
 

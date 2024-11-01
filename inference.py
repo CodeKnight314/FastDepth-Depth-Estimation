@@ -46,10 +46,10 @@ def inference(root_dir: str, output_dir: str, path: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Depth estimation on images using a pre-trained model.")
     
-    parser.add_argument('--root_dir', type=str, required=True, help="Directory containing input images.")
-    parser.add_argument('--output_dir', type=str, required=True, help="Directory to save depth images.")
-    parser.add_argument('--resize', action='store_true', help="Whether to resize depth images to the original image size.")
+    parser.add_argument('--root', type=str, required=True, help="Directory containing input images.")
+    parser.add_argument('--output', type=str, required=True, help="Directory to save depth images.")
+    parser.add_argument('--path', type=str, help="Path to model .pth file for FastDepth")
     
     args = parser.parse_args()
     
-    inference(args.root_dir, args.output_dir, args.resize)
+    inference(args.root_dir, args.output_dir, args.path)

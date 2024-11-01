@@ -5,18 +5,27 @@ from tqdm import tqdm
 from model import FastDepth
 import torch.optim as opt
 import argparse
-from dataset import load_dataset
+from dataset import load_dataset, DataLoader
 from loss import ScaleInvariantLoss
 import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def depth_estimation(model, optimizer, train_dl, valid_dl, logger, loss_fn, epochs, output_path):
+def depth_estimation(model: FastDepth, 
+                     optimizer: opt.SGD, 
+                     train_dl: DataLoader, 
+                     valid_dl: DataLoader, 
+                     logger: LOGWRITER, 
+                     loss_fn: ScaleInvariantLoss, 
+                     epochs: int, output_path: str):
+    
     # Early Stop mechanism
     es_mech = EarlyStopMechanism(metric_threshold=0.015, 
                                  mode='min', 
                                  grace_threshold=10, 
                                  save_path=os.path.join(output_path, "saved_weights/"))
+    
+    scheduler = opt.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.2, step_size=5)
 
     for epoch in range(epochs):
         model.train()
@@ -46,7 +55,9 @@ def depth_estimation(model, optimizer, train_dl, valid_dl, logger, loss_fn, epoc
 
         avg_val_loss = total_val_loss / len(valid_dl)
 
-        es_mech.step(model=model, metric=avg_val_loss)
+        es_mech.step(model=model, metric=avg_train_loss)
+        scheduler.step()
+        
         if es_mech.check():
             logger.write("[INFO] Early Stopping Mechanism Engaged. Training procedure ended early.")
             break
@@ -55,11 +66,11 @@ def depth_estimation(model, optimizer, train_dl, valid_dl, logger, loss_fn, epoc
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_dir", type=str, required=True, help="Path to the root directory of the dataset")
-    parser.add_argument("--output_path", type=str, required=True, help="Path to save output files and logs")
+    parser.add_argument("--root", type=str, required=True, help="Path to the root directory of the dataset")
+    parser.add_argument("--output", type=str, required=True, help="Path to save output files and logs")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate for the optimizer")
-    parser.add_argument("--batch_size", type=int, default=8, help="Batch size for training and validation")
+    parser.add_argument("--batch", type=int, default=8, help="Batch size for training and validation")
     args = parser.parse_args()
     
     model = FastDepth(input_channels=3).to(device=device)

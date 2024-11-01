@@ -15,10 +15,15 @@ def create_directories(destination_dir: str):
         os.makedirs(path, exist_ok=True)
     return paths
 
-def copy_images(img_pairs, dest_dirs, description):
+def copy_images(img_pairs, dest_dirs: str, description: str):
+    counter = 1
     for rgb, depth in tqdm(img_pairs, desc=description):
-        shutil.copy(rgb, os.path.join(dest_dirs[0], os.path.basename(rgb)))
-        shutil.copy(depth, os.path.join(dest_dirs[1], os.path.basename(depth)))
+        filename = f"{counter:06d}"
+        rgb_dest_path = os.path.join(dest_dirs[0], f"{filename}.jpg")
+        depth_dest_path = os.path.join(dest_dirs[1], f"{filename}.png")
+        shutil.copy(rgb, rgb_dest_path)
+        shutil.copy(depth, depth_dest_path)
+        counter += 1
 
 def preprocess_data(source_dir: str, destination_dir: str):
     train_rgb_dir, train_depth_dir, test_rgb_dir, test_depth_dir = create_directories(destination_dir)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import argparse
 from loss import ScaleInvariantLoss
-from dataset import load_dataset
+from dataset import load_dataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -10,7 +10,7 @@ from model import FastDepth
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def evaluate(model, val_dl, output_path, device="cuda"):
+def evaluate(model: FastDepth, val_dl: DataLoader, output_path: str, device: torch.device ="cuda"):
     criterion = ScaleInvariantLoss(weight=0.5)
     
     os.makedirs(output_path, exist_ok=True)
@@ -29,8 +29,12 @@ def evaluate(model, val_dl, output_path, device="cuda"):
         total_val_loss += loss.item()
         
         rgb = rgb.cpu().squeeze().permute(1, 2, 0)
-        pred_depth = outputs.cpu().squeeze()
-        gt_depth = depth.cpu().squeeze()
+        
+        pred_depth = outputs.cpu().squeeze().numpy()
+        pred_depth = pred_depth / pred_depth.max() if pred_depth.max() > 0 else 1.0
+        
+        gt_depth = depth.cpu().squeeze().numpy()
+        gt_depth = gt_depth / gt_depth.max() if gt_depth.max() > 0 else 1.0
         
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         axes[0].imshow(rgb)
@@ -55,8 +59,8 @@ def evaluate(model, val_dl, output_path, device="cuda"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_dir", type=str, required=True, help="Path to the root directory of the dataset")
-    parser.add_argument("--output_path", type=str, required=True, help="Path to save output files and logs")
+    parser.add_argument("--root", type=str, required=True, help="Path to the root directory of the dataset")
+    parser.add_argument("--output", type=str, required=True, help="Path to save output files and logs")
     args = parser.parse_args()
     
     model = FastDepth(input_channels=3).to(device=device)    

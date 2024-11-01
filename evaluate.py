@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import argparse
-from loss import ScaleInvariantLoss
+from loss import FastDepthLoss
 from dataset import load_dataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -11,7 +11,7 @@ from model import FastDepth
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def evaluate(model: FastDepth, val_dl: DataLoader, output_path: str, device: torch.device ="cuda"):
-    criterion = ScaleInvariantLoss(weight=0.5)
+    criterion = FastDepthLoss()
     
     os.makedirs(output_path, exist_ok=True)
 

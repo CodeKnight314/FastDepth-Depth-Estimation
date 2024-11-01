@@ -6,7 +6,7 @@ from model import FastDepth
 import torch.optim as opt
 import argparse
 from dataset import load_dataset, DataLoader
-from loss import ScaleInvariantLoss
+from loss import FastDepthLoss
 import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -16,7 +16,7 @@ def depth_estimation(model: FastDepth,
                      train_dl: DataLoader, 
                      valid_dl: DataLoader, 
                      logger: LOGWRITER, 
-                     loss_fn: ScaleInvariantLoss, 
+                     loss_fn: FastDepthLoss, 
                      epochs: int, output_path: str):
     
     # Early Stop mechanism
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     
     logger = LOGWRITER(output_directory=os.path.join(args.output_path, "experiment_log"), total_epochs=args.epochs)
     
-    criterion = ScaleInvariantLoss(weight=0.5)
+    criterion = FastDepthLoss()
     
     train_dl = load_dataset(args.root_dir, "train", args.batch_size)
     val_dl = load_dataset(args.root_dir, "test", args.batch_size)

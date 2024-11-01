@@ -76,11 +76,13 @@ if __name__ == "__main__":
     model = FastDepth(input_channels=3).to(device=device)
     optimizer = opt.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0001)
     
-    logger = LOGWRITER(output_directory=os.path.join(args.output_path, "experiment_log"), total_epochs=args.epochs)
+    directory = os.path.join(args.output, "experiment_log")
+    os.makedirs(directory, exist_ok=True)
+    logger = LOGWRITER(output_directory=directory, total_epochs=args.epochs)
     
     criterion = FastDepthLoss()
     
-    train_dl = load_dataset(args.root_dir, "train", args.batch_size)
-    val_dl = load_dataset(args.root_dir, "test", args.batch_size)
+    train_dl = load_dataset(args.root, "train", args.batch)
+    val_dl = load_dataset(args.root, "test", args.batch)
     
-    depth_estimation(model, optimizer, train_dl, val_dl, logger, criterion, args.epochs, args.output_path)
+    depth_estimation(model, optimizer, train_dl, val_dl, logger, criterion, args.epochs, args.output)

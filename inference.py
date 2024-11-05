@@ -6,7 +6,7 @@ from glob import glob
 from PIL import Image
 from torchvision import transforms as T
 import numpy as np
-from model import FastDepth
+from model import ResNetDepth
 
 def inference(root_dir: str, output_dir: str, path: str):
     """
@@ -19,7 +19,7 @@ def inference(root_dir: str, output_dir: str, path: str):
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    model = FastDepth(input_channels=3).to(device)
+    model = ResNetDepth(input_channels=3).to(device)
     model.load_state_dict(torch.load(path, map_location=device))
     model.eval()
     
@@ -34,7 +34,8 @@ def inference(root_dir: str, output_dir: str, path: str):
         
         with torch.no_grad():
             depth_tensor = model(img_tensor)
-            
+            depth_tensor = depth_tensor.functional.interpolate(depth_tensor, size=img_tensor.shape[2:], mode='bilinear', align_corners=False)
+
         depth_image = depth_tensor.squeeze().cpu().numpy()
         depth_image = 255 * depth_image
         depth_image = depth_image.astype(np.uint8)
@@ -52,4 +53,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    inference(args.root_dir, args.output_dir, args.path)
+    inference(args.root, args.output, args.path)

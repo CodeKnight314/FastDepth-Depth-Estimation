@@ -5,11 +5,11 @@ import math
 
 class FastDepthLoss(nn.Module):
     def __init__(self,
-                 weight_scale_invariant: float = 0.2,
-                 weight_l1: float = 0.5,
-                 weight_gradient=0.2,
-                 weight_ssim = 0.1,
-                 weight_edge=0.1):
+                 weight_scale_invariant: float = 0.0,
+                 weight_l1: float = 1.0,
+                 weight_gradient=0.0,
+                 weight_ssim = 0.0,
+                 weight_edge=0.0):
 
         super(FastDepthLoss, self).__init__()
 

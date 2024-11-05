@@ -8,6 +8,7 @@ import argparse
 from dataset import load_dataset, DataLoader
 from loss import FastDepthLoss
 import os
+import torch.nn as nn
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -19,13 +20,12 @@ def depth_estimation(model: FastDepth,
                      loss_fn: FastDepthLoss, 
                      epochs: int, output_path: str):
     
-    # Early Stop mechanism
     es_mech = EarlyStopMechanism(metric_threshold=0.015, 
                                  mode='min', 
-                                 grace_threshold=10, 
+                                 grace_threshold=50, 
                                  save_path=os.path.join(output_path, "saved_weights/"))
     
-    scheduler = opt.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.2, step_size=5)
+    scheduler = opt.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=50, eta_min=1e-5)
 
     for epoch in range(epochs):
         model.train()
@@ -35,6 +35,9 @@ def depth_estimation(model: FastDepth,
             optimizer.zero_grad()
             
             outputs = model(rgb)
+            
+            outputs = nn.functional.interpolate(outputs, size=depth.shape[2:], mode='bilinear', align_corners=False)
+
             loss = loss_fn(outputs, depth)
             
             loss.backward()
@@ -50,12 +53,15 @@ def depth_estimation(model: FastDepth,
             for images, labels in tqdm(valid_dl, desc=f"Validating Epoch {epoch+1}/{epochs}"):
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
+                
+                outputs = nn.functional.interpolate(outputs, size=depth.shape[2:], mode='bilinear', align_corners=False)
+
                 loss = loss_fn(outputs, labels)
                 total_val_loss += loss.item()
 
         avg_val_loss = total_val_loss / len(valid_dl)
 
-        es_mech.step(model=model, metric=avg_train_loss)
+        es_mech.step(model=model, metric=avg_val_loss)
         scheduler.step()
         
         if es_mech.check():
@@ -63,13 +69,14 @@ def depth_estimation(model: FastDepth,
             break
 
         logger.log_results(epoch=epoch+1, tr_loss=avg_train_loss, val_loss=avg_val_loss)
+    es_mech.save_model(model=model)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, required=True, help="Path to the root directory of the dataset")
     parser.add_argument("--output", type=str, required=True, help="Path to save output files and logs")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate for the optimizer")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for the optimizer")
     parser.add_argument("--batch", type=int, default=8, help="Batch size for training and validation")
     args = parser.parse_args()
     

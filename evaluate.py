@@ -6,11 +6,11 @@ from dataset import load_dataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
-from model import FastDepth
+from model import ResNetDepth
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def evaluate(model: FastDepth, val_dl: DataLoader, output_path: str, device: torch.device ="cuda"):
+def evaluate(model: ResNetDepth, val_dl: DataLoader, output_path: str, device: torch.device ="cuda"):
     criterion = FastDepthLoss()
     
     os.makedirs(output_path, exist_ok=True)
@@ -24,7 +24,8 @@ def evaluate(model: FastDepth, val_dl: DataLoader, output_path: str, device: tor
         
         with torch.no_grad():
             outputs = model(rgb)
-        
+            outputs = nn.functional.interpolate(outputs, size=depth.shape[2:], mode='bilinear', align_corners=False)
+
         loss = criterion(outputs, depth)
         total_val_loss += loss.item()
         
@@ -61,10 +62,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, required=True, help="Path to the root directory of the dataset")
     parser.add_argument("--output", type=str, required=True, help="Path to save output files and logs")
+    parser.add_argument("--path", type=str, required=True, help="Path for model .pth file")
     args = parser.parse_args()
     
-    model = FastDepth(input_channels=3).to(device=device)    
+    model = ResNetDepth().to(device=device)    
+    model.load_state_dict(torch.load(args.path))
     
-    val_dl = load_dataset(args.root_dir, "test", 1)
+    val_dl = load_dataset(args.root, "test", 1)
     
-    evaluate(model, val_dl, args.output_path)
+    evaluate(model, val_dl, args.output)

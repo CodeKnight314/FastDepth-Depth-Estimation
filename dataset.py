@@ -6,6 +6,7 @@ from PIL import Image
 import numpy as np
 import torch
 import argparse
+import matplotlib.pyplot as plt
 
 class NYU_DepthDataset(Dataset):
     def __init__(self, input_dir: str, mode: str):
@@ -48,8 +49,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    train_loader = load_dataset(args.path, "train", args.batch_size)
-    test_loader = load_dataset(args.path, "test", args.batch_size)
+    train_loader = load_dataset(args.path, "train", args.batch)
+    test_loader = load_dataset(args.path, "test", args.batch)
     
     tr_rgb, tr_depth = next(iter(train_loader))
     ts_rgb, ts_depth = next(iter(test_loader))
@@ -63,3 +64,6 @@ if __name__ == "__main__":
 
     inspect_data(tr_rgb, tr_depth)
     inspect_data(ts_rgb, ts_depth)
+    
+    plt.imshow(tr_depth.squeeze(0).squeeze(0))
+    plt.show()

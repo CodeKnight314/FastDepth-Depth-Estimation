@@ -2,7 +2,7 @@ import torch
 from utils.early_stop import EarlyStopMechanism
 from utils.log_writer import LOGWRITER
 from tqdm import tqdm
-from model import FastDepth
+from model import ResNetDepth
 import torch.optim as opt
 import argparse
 from dataset import load_dataset, DataLoader
@@ -12,18 +12,13 @@ import torch.nn as nn
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def depth_estimation(model: FastDepth, 
+def depth_estimation(model: ResNetDepth, 
                      optimizer: opt.SGD, 
                      train_dl: DataLoader, 
                      valid_dl: DataLoader, 
-                     logger: LOGWRITER, 
                      loss_fn: FastDepthLoss, 
-                     epochs: int, output_path: str):
-    
-    es_mech = EarlyStopMechanism(metric_threshold=0.015, 
-                                 mode='min', 
-                                 grace_threshold=50, 
-                                 save_path=os.path.join(output_path, "saved_weights/"))
+                     epochs: int, 
+                     output_path: str):
     
     scheduler = opt.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=50, eta_min=1e-5)
 
@@ -36,9 +31,9 @@ def depth_estimation(model: FastDepth,
             
             outputs = model(rgb)
             
-            outputs = nn.functional.interpolate(outputs, size=depth.shape[2:], mode='bilinear', align_corners=False)
-
             loss = loss_fn(outputs, depth)
+            
+            total_val_loss += loss.item()
             
             loss.backward()
             optimizer.step()
@@ -49,27 +44,32 @@ def depth_estimation(model: FastDepth,
 
         model.eval()
         total_val_loss = 0.0
+        abs_rel_sum = 0.0
+        rmse_sum = 0.0
         with torch.no_grad():
-            for images, labels in tqdm(valid_dl, desc=f"Validating Epoch {epoch+1}/{epochs}"):
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
+            for rgb, depth in tqdm(valid_dl, desc=f"Validating Epoch {epoch+1}/{epochs}"):
+                rgb, depth = rgb.to(device), depth.to(device)
+                outputs = model(rgb)
                 
-                outputs = nn.functional.interpolate(outputs, size=depth.shape[2:], mode='bilinear', align_corners=False)
-
-                loss = loss_fn(outputs, labels)
+                loss = loss_fn(outputs, depth)
+                abs_rel = torch.mean(torch.abs(outputs - depth) / depth).item()
+                rmse = torch.sqrt(torch.mean((outputs - depth) ** 2)).item()
+                
                 total_val_loss += loss.item()
+                abs_rel_sum += abs_rel 
+                rmse_sum += rmse
 
         avg_val_loss = total_val_loss / len(valid_dl)
-
-        es_mech.step(model=model, metric=avg_val_loss)
+        avg_abs_rel = abs_rel_sum / len(valid_dl)
+        avg_rmse = rmse_sum / len(valid_dl)
+            
         scheduler.step()
-        
-        if es_mech.check():
-            logger.write("[INFO] Early Stopping Mechanism Engaged. Training procedure ended early.")
-            break
-
-        logger.log_results(epoch=epoch+1, tr_loss=avg_train_loss, val_loss=avg_val_loss)
-    es_mech.save_model(model=model)
+        torch.save(model.state_dict(), os.path.join(output_path, "depth_model.pth"))
+        print(f"Epoch {epoch+1}/{epochs}")
+        print(f"  Train Loss: {avg_train_loss:.4f}")
+        print(f"  Val Loss: {avg_val_loss:.4f}")
+        print(f"  AbsRel: {avg_abs_rel:.4f}")
+        print(f"  RMSE: {avg_rmse:.4f}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -78,18 +78,18 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for the optimizer")
     parser.add_argument("--batch", type=int, default=8, help="Batch size for training and validation")
+    parser.add_argument("--validation", action='store_true', help="Flag to disable validation metrics")
     args = parser.parse_args()
     
-    model = FastDepth(input_channels=3).to(device=device)
+    model = ResNetDepth().to(device=device)
     optimizer = opt.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0001)
     
     directory = os.path.join(args.output, "experiment_log")
     os.makedirs(directory, exist_ok=True)
-    logger = LOGWRITER(output_directory=directory, total_epochs=args.epochs)
     
     criterion = FastDepthLoss()
     
     train_dl = load_dataset(args.root, "train", args.batch)
     val_dl = load_dataset(args.root, "test", args.batch)
     
-    depth_estimation(model, optimizer, train_dl, val_dl, logger, criterion, args.epochs, args.output)
+    depth_estimation(model, optimizer, train_dl, val_dl, criterion, args.epochs, args.output)

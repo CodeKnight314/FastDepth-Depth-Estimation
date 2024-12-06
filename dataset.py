@@ -7,9 +7,10 @@ import numpy as np
 import torch
 import argparse
 import matplotlib.pyplot as plt
+from typing import Tuple 
 
 class NYU_DepthDataset(Dataset):
-    def __init__(self, input_dir: str, mode: str):
+    def __init__(self, input_dir: str, mode: str, patch_size: Tuple[int, int] = (224, 224)):
         super().__init__()
         
         self.rgb_images = sorted(glob(os.path.join(input_dir, mode, "RGB" "/*")))
@@ -17,11 +18,18 @@ class NYU_DepthDataset(Dataset):
         
         assert len(self.rgb_images) == len(self.depth_images), "Number of RGB and depth images should be the same."
         
-        self.rgb_transform = T.ToTensor()
-        self.depth_transform = T.ToTensor()
+        self.rgb_transform = T.Compose([T.Resize(patch_size), T.ToTensor()])
+        self.depth_transform = T.Compose([T.Resize(patch_size), T.ToTensor()])
         
     def __len__(self):
         return len(self.rgb_images)
+    
+    def checkNorm(self, tensor: torch.Tensor): 
+        min_val = tensor.min().item() 
+        max_val = tensor.max().item() 
+        
+        if(min_val < 0.0 or max_val > 1.0): 
+            raise ValueError(f"Tensor not within range of [0, 1], found [{min_val, max_val}] instead")
     
     def __getitem__(self, index: int):
         rgb_img = Image.open(self.rgb_images[index]).convert("RGB")
@@ -34,6 +42,9 @@ class NYU_DepthDataset(Dataset):
         depth_np = depth_np / max_depth_value
         
         depth_tensor = torch.from_numpy(depth_np).unsqueeze(0)
+        
+        self.checkNorm(rgb_tensor)
+        self.checkNorm(depth_tensor)
         
         return rgb_tensor, depth_tensor
     

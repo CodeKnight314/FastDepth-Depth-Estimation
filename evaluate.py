@@ -6,11 +6,11 @@ from dataset import load_dataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
-from model import ResNetDepth
+from model import ResNetFastDepth
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def evaluate(model: ResNetDepth, val_dl: DataLoader, output_path: str, device: torch.device ="cuda"):
+def evaluate(model: ResNetFastDepth, val_dl: DataLoader, output_path: str, device: torch.device ="cuda"):
     criterion = FastDepthLoss()
     
     os.makedirs(output_path, exist_ok=True)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, required=True, help="Path for model .pth file")
     args = parser.parse_args()
     
-    model = ResNetDepth().to(device=device)    
+    model = ResNetFastDepth().to(device=device)    
     model.load_state_dict(torch.load(args.path))
     
     val_dl = load_dataset(args.root, "test", 1)

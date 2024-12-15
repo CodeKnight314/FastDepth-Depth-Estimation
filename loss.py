@@ -78,7 +78,8 @@ class SSIM(nn.Module):
         for x, y in zip(x_tensors, y_tensors):
             SSIM_values += self.channel_calculation(x, y)
         
-        return 1 - SSIM_values / len(x_tensors) 
+        final_ssim = 1 - SSIM_values / len(x_tensors) 
+        return final_ssim
 
 class FastDepthLoss(nn.Module):
     def __init__(self,
@@ -94,13 +95,11 @@ class FastDepthLoss(nn.Module):
         
         self.sobel_x = nn.Parameter(torch.Tensor([[-1, 0, 1], 
                                                   [-2, 0, 2], 
-                                                  [-1, 0, 1]]), 
-                                    dtype=torch.float32, requires_grad=False)
+                                                  [-1, 0, 1]]))
     
         self.sobel_y = nn.Parameter(torch.Tensor([[-1, -2, -1], 
                                                   [0, 0, 0], 
-                                                  [1, 2, 1]]), 
-                                    dtype=torch.float32, requires_grad=False)
+                                                  [1, 2, 1]]))
         
         self.conv_x = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=False)
         self.conv_x.weight = nn.Parameter(self.sobel_x.unsqueeze(0).unsqueeze(0))
@@ -133,7 +132,7 @@ class FastDepthLoss(nn.Module):
         target_grad_y = self.conv_y(target)
         
         grad_loss = torch.sqrt(pred_grad_x**2 + pred_grad_y**2) - torch.sqrt(target_grad_x**2 + target_grad_y**2)
-        return grad_loss
+        return grad_loss.mean()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor):
         si_loss = self.scale_invariant_loss(pred, gt)
@@ -158,9 +157,9 @@ def kl_divergence(prediction: torch.Tensor, target: torch.Tensor):
     eps = 1e-10
     
     prediction = prediction + eps 
-    targets = targets + eps 
+    target = target + eps 
     
-    return torch.sum(target * torch.log(target / prediction), dim=-1).item()
+    return torch.sum(target * torch.log(target / prediction), dim=-1).mean().item()
 
 if __name__ == "__main__":
     criterion = FastDepthLoss()

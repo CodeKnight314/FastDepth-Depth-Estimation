@@ -36,13 +36,11 @@ class NYU_DepthDataset(Dataset):
         rgb_tensor = self.rgb_transform(rgb_img)
         
         depth_img = Image.open(self.depth_images[index])
-        depth_np = np.array(depth_img, dtype=np.float32)
+        depth_tensor = self.depth_transform(depth_img)
         
-        max_depth_value = depth_np.max() if depth_np.max() > 0 else 1.0
-        depth_np = depth_np / max_depth_value
-        
-        depth_tensor = torch.from_numpy(depth_np).unsqueeze(0)
-        
+        max_depth_value = depth_tensor.max() if depth_tensor.max() > 0 else 1.0
+        depth_tensor = depth_tensor / max_depth_value
+                
         self.checkNorm(rgb_tensor)
         self.checkNorm(depth_tensor)
         

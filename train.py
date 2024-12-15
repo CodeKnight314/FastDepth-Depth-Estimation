@@ -11,20 +11,21 @@ import time
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def map_histogram(array: torch.Tensor, output_dir: str):
-    """
-    Mapping histograms of any given torch array 
+def map_histogram(pred: torch.Tensor, gt: torch.Tensor, output_path: str):
+    fig, ax = plt.subplots(figsize=(10, 6))
     
-    Args: 
-        array (torch.Tensor): 1D or 2D tensors that contain the array of values within distribution 
-        output_dir (str): output path that directly references where to store the png
-    """
-    if len(array.shape) > 2:
-        array = array.view(array.shape[0], -1)
-        
-    np_array = array.numpy()
-    plt.hist(np_array)
-    plt.savefig(output_dir)
+    pred_np = pred.cpu().numpy().flatten()
+    gt_np = gt.cpu().numpy().flatten()
+    
+    ax.hist(pred_np, bins=50, alpha=0.5, label='Predicted Depth', color='blue')
+    ax.hist(gt_np, bins=50, alpha=0.5, label='Ground Truth', color='red')
+    
+    ax.set_xlabel('Depth Value')
+    ax.set_ylabel('Frequency')
+    ax.set_title('Depth Value Distribution')
+    ax.legend()
+    
+    plt.savefig(output_path)
     plt.close()
     
 def map_heatmap(pred: torch.Tensor, gt: torch.Tensor, output_dir: str): 
@@ -34,9 +35,24 @@ def map_heatmap(pred: torch.Tensor, gt: torch.Tensor, output_dir: str):
     Args:
         array (torch.Tensor): 2D tensors of
     """
-    diff = (pred - gt) ** 2
-    plt.imshow(diff, cmap="hot", interpolation="nearest")
+    diff = pred - gt
+    plt.imshow(diff)
     plt.savefig(output_dir)
+    plt.close()
+
+def plot_curves(data: list, labels: list, path: str, title: str = None, x_axis: str = None, y_axis: str = None): 
+    if len(data) != len(labels):
+        raise ValueError("The number of data lists must match the number of labels.")
+
+    for d, label in zip(data, labels):
+        data_range = range(1, len(d) + 1)
+        plt.plot(data_range, d, label=label)
+    
+    plt.xlabel(x_axis)
+    plt.ylabel(y_axis)
+    plt.title(title)
+    plt.legend()
+    plt.savefig(path)
     plt.close()
     
 def diagnose_gradient_flow(model: ResNetFastDepth):
@@ -62,6 +78,9 @@ def depth_estimation(model: ResNetFastDepth,
 
     train_curve = [] 
     valid_curve = []
+    kl_curve = [] 
+    absRel_curve = [] 
+    rmse_curve = []
 
     for epoch in range(epochs):
         model.train()
@@ -76,12 +95,11 @@ def depth_estimation(model: ResNetFastDepth,
             loss = loss_fn(outputs, depth)
                         
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             total_train_loss += loss.item()
         
-        diagnose_gradient_flow(model)
-
         avg_train_loss = total_train_loss / len(train_dl)
 
         model.eval()
@@ -104,10 +122,6 @@ def depth_estimation(model: ResNetFastDepth,
                 abs_rel_sum += abs_rel 
                 rmse_sum += rmse
                 total_kl_divergence += kl_loss
-                
-                map_histogram(outputs[0], os.path.join(output_path, f"random_sample_pred_{i}.png"))
-                map_histogram(depth[0],  os.path.join(output_path, f"random_sample_gt_{i}.png"))
-                map_heatmap(outputs[0], depth[0], os.path.join(output_path, f"random_sample_heatmap_{i}.png"))
 
         avg_val_loss = total_val_loss / len(valid_dl)
         avg_abs_rel = abs_rel_sum / len(valid_dl)
@@ -116,9 +130,20 @@ def depth_estimation(model: ResNetFastDepth,
         
         train_curve.append(avg_train_loss)
         valid_curve.append(avg_val_loss)
+        kl_curve.append(avg_kl)
+        absRel_curve.append(avg_abs_rel)
+        rmse_curve.append(avg_rmse)
             
         scheduler.step()
-        torch.save(model.state_dict(), os.path.join(output_path, "depth_model.pth"))
+        torch.save(model.state_dict(), os.path.join(output_path, f"Epoch_{epoch+1}_depth_model.pth"))
+        
+        rgb, depth = next(iter(val_dl))
+        with torch.no_grad(): 
+            pred = model(rgb)
+        
+        for i in range(rgb.shape[0]): 
+            map_histogram(rgb[i].squeeze(0), pred[i].squeeze(0), os.path.join(output_path, f"Epoch_{epoch+1}/sample_{i}_histogram.png"))
+        
         print(f"Epoch {epoch+1}/{epochs}")
         print(f"  Train Loss: {avg_train_loss:.4f}")
         print(f"  Val Loss: {avg_val_loss:.4f}")
@@ -126,15 +151,11 @@ def depth_estimation(model: ResNetFastDepth,
         print(f"  RMSE: {avg_rmse:.4f}")
         print(f"  KL Loss: {avg_kl:.4f}")
 
-    data_range = range(1, len(train_curve) + 1)
-    plt.plot(train_curve, data_range, label="training loss curve")
-    plt.plot(valid_curve, data_range, label="validation loss curve")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title("Training and Validaiton Loss on graph")
-    plt.savefig(os.path.join(output_path, f"Curve_plot_{time.time()}.png"))
-    plt.close()
-        
+    plot_curves([train_curve, valid_curve], labels=["Training Loss", "Validation Loss"], path=os.path.join(output_path, f"Loss function curve.png"), title="Loss function curve", x_axis="Epochs", y_axis="Loss")
+    plot_curves([kl_curve], ["KL Divergence Loss"], path=os.path.join(output_path, "KL_Divergence_Curve.png"), title="KL Divergence Curve", x_axis="Epoch", y_axis="Loss")
+    plot_curves([absRel_curve], ["ABS REL Loss"], path=os.path.join(output_path, "ABS_REL_Curve.png"), title="ABS REL loss curve", x_axis="Epochs", y_axis="Loss")
+    plot_curves([rmse_curve], ["RMSE Loss"], path=os.path.join(output_path, "RMSE_Curve.png"), title="ABS REL loss curve", x_axis="Epochs", y_axis="Loss")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, required=True, help="Path to the root directory of the dataset")
@@ -147,9 +168,6 @@ if __name__ == "__main__":
     
     model = ResNetFastDepth().to(device=device)
     optimizer = opt.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0001)
-    
-    directory = os.path.join(args.output, "experiment_log")
-    os.makedirs(directory, exist_ok=True)
     
     criterion = FastDepthLoss()
     
